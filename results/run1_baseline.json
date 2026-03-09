@@ -1,0 +1,104 @@
+{
+  "benchmark_version": "0.1",
+  "protocol": "cross_patient_fixed",
+  "model_name": "NeuroWave Run 1 (Baseline)",
+  "model_description": "Modified transformer 384d/8L, DWT tokenizer, no class weighting",
+  "model_params": 20770192,
+  "training_time_hours": null,
+  "hardware": "cpu",
+  "per_class": {
+    "interictal": {
+      "correct": 65,
+      "total": 2000,
+      "accuracy": 0.0325
+    },
+    "preictal": {
+      "correct": 0,
+      "total": 6570,
+      "accuracy": 0.0
+    },
+    "ictal": {
+      "correct": 0,
+      "total": 1548,
+      "accuracy": 0.0
+    }
+  },
+  "confusion_matrix": {
+    "interictal": {
+      "pred_interictal": 65,
+      "pred_preictal": 0,
+      "pred_ictal": 0
+    },
+    "preictal": {
+      "pred_interictal": 308,
+      "pred_preictal": 0,
+      "pred_ictal": 0
+    },
+    "ictal": {
+      "pred_interictal": 58,
+      "pred_preictal": 0,
+      "pred_ictal": 0
+    }
+  },
+  "seizure_discrimination": 0.0,
+  "false_negative_rate": 0.0450849963045085,
+  "sensitivity": 0.0,
+  "specificity": 0.0325,
+  "f1_macro": 0.017825311942959002,
+  "miss_rate": 0.0,
+  "lead_time": {},
+  "per_patient": {
+    "all_test": {
+      "patient_id": "all_test",
+      "per_class": {
+        "interictal": {
+          "correct": 65,
+          "total": 2000,
+          "accuracy": 0.0325
+        },
+        "preictal": {
+          "correct": 0,
+          "total": 6570,
+          "accuracy": 0.0
+        },
+        "ictal": {
+          "correct": 0,
+          "total": 1548,
+          "accuracy": 0.0
+        }
+      },
+      "confusion_matrix": {
+        "interictal": {
+          "pred_interictal": 65,
+          "pred_preictal": 0,
+          "pred_ictal": 0
+        },
+        "preictal": {
+          "pred_interictal": 308,
+          "pred_preictal": 0,
+          "pred_ictal": 0
+        },
+        "ictal": {
+          "pred_interictal": 58,
+          "pred_preictal": 0,
+          "pred_ictal": 0
+        }
+      },
+      "seizure_discrimination": 0.0,
+      "false_negative_rate": 0.0450849963045085,
+      "sensitivity": 0.0,
+      "specificity": 0.0325,
+      "f1_macro": 0.017825311942959002,
+      "miss_rate": 0.0,
+      "total_seizure_events": 0,
+      "missed_events": 0,
+      "lead_time": {
+        "mean_seconds": 0.0,
+        "median_seconds": 0.0,
+        "min_seconds": 0.0,
+        "max_seconds": 0.0,
+        "n_predictions": 0
+      }
+    }
+  }
+}

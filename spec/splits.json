@@ -1,0 +1,41 @@
+{
+  "benchmark_version": "0.1",
+  "dataset": "CHB-MIT Scalp EEG Database v1.0.0",
+  "source": "https://physionet.org/content/chbmit/1.0.0/",
+  "sampling_rate_hz": 256,
+  "preictal_window_seconds": 300,
+  "postictal_exclusion_seconds": 300,
+  "min_inter_seizure_gap_seconds": 600,
+
+  "all_patients": [
+    "chb01", "chb02", "chb03", "chb04", "chb05", "chb06",
+    "chb07", "chb08", "chb09", "chb10", "chb11", "chb12",
+    "chb13", "chb14", "chb15", "chb16", "chb17", "chb18",
+    "chb19", "chb20", "chb21", "chb22", "chb23", "chb24"
+  ],
+
+  "protocol_3_cross_patient": {
+    "train": ["chb01", "chb03", "chb05", "chb06", "chb08", "chb10", "chb12", "chb13", "chb15", "chb18", "chb20", "chb24"],
+    "val":   ["chb04", "chb09", "chb14", "chb16", "chb21"],
+    "test":  ["chb02", "chb07", "chb11", "chb17", "chb19", "chb22", "chb23"],
+    "rationale": "High-seizure patients (chb12, chb15, chb24) in train. Mix of seizure frequencies across all sets. Deterministic split."
+  },
+
+  "protocol_1_patient_specific": {
+    "method": "chronological_split",
+    "train_fraction": 0.7,
+    "test_fraction": 0.3,
+    "notes": "Per-patient chronological split. First 70% of recordings = train, last 30% = test. No shuffling."
+  },
+
+  "protocol_2_lopo": {
+    "method": "leave_one_patient_out",
+    "notes": "For each patient: train on remaining 23, test on held-out. 24 training runs total."
+  },
+
+  "labels": {
+    "0": {"name": "interictal", "token_id": 5, "description": "Normal EEG, not within preictal or ictal window"},
+    "1": {"name": "preictal",   "token_id": 6, "description": "300 seconds before seizure onset"},
+    "2": {"name": "ictal",      "token_id": 7, "description": "During seizure (onset to offset)"}
+  }
+}

@@ -1,0 +1,104 @@
+{
+  "benchmark_version": "0.1",
+  "protocol": "cross_patient_fixed",
+  "model_name": "NeuroWave Run 3b (Low LR)",
+  "model_description": "Modified transformer 384d/8L, enhanced tokenizer, weighted loss, lower LR",
+  "model_params": 27958672,
+  "training_time_hours": null,
+  "hardware": "cpu",
+  "per_class": {
+    "interictal": {
+      "correct": 4,
+      "total": 2000,
+      "accuracy": 0.002
+    },
+    "preictal": {
+      "correct": 6560,
+      "total": 6570,
+      "accuracy": 0.9984779299847792
+    },
+    "ictal": {
+      "correct": 0,
+      "total": 1548,
+      "accuracy": 0.0
+    }
+  },
+  "confusion_matrix": {
+    "interictal": {
+      "pred_interictal": 4,
+      "pred_preictal": 1996,
+      "pred_ictal": 0
+    },
+    "preictal": {
+      "pred_interictal": 10,
+      "pred_preictal": 6560,
+      "pred_ictal": 0
+    },
+    "ictal": {
+      "pred_interictal": 1,
+      "pred_preictal": 1547,
+      "pred_ictal": 0
+    }
+  },
+  "seizure_discrimination": 0.8080808080808081,
+  "false_negative_rate": 0.0013550135501355014,
+  "sensitivity": 0.8080808080808081,
+  "specificity": 0.002,
+  "f1_macro": 0.26362373365118774,
+  "miss_rate": 0.0,
+  "lead_time": {},
+  "per_patient": {
+    "all_test": {
+      "patient_id": "all_test",
+      "per_class": {
+        "interictal": {
+          "correct": 4,
+          "total": 2000,
+          "accuracy": 0.002
+        },
+        "preictal": {
+          "correct": 6560,
+          "total": 6570,
+          "accuracy": 0.9984779299847792
+        },
+        "ictal": {
+          "correct": 0,
+          "total": 1548,
+          "accuracy": 0.0
+        }
+      },
+      "confusion_matrix": {
+        "interictal": {
+          "pred_interictal": 4,
+          "pred_preictal": 1996,
+          "pred_ictal": 0
+        },
+        "preictal": {
+          "pred_interictal": 10,
+          "pred_preictal": 6560,
+          "pred_ictal": 0
+        },
+        "ictal": {
+          "pred_interictal": 1,
+          "pred_preictal": 1547,
+          "pred_ictal": 0
+        }
+      },
+      "seizure_discrimination": 0.8080808080808081,
+      "false_negative_rate": 0.0013550135501355014,
+      "sensitivity": 0.8080808080808081,
+      "specificity": 0.002,
+      "f1_macro": 0.26362373365118774,
+      "miss_rate": 0.0,
+      "total_seizure_events": 0,
+      "missed_events": 0,
+      "lead_time": {
+        "mean_seconds": 0.0,
+        "median_seconds": 0.0,
+        "min_seconds": 0.0,
+        "max_seconds": 0.0,
+        "n_predictions": 0
+      }
+    }
+  }
+}
