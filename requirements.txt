@@ -4,3 +4,4 @@
 
 numpy>=1.20
 torch>=2.0           # CNN baseline; CPU-only install is fine for reference baselines
+mne>=1.0             # CHB-MIT EDF loader used by scripts/benchmark_runner.py
