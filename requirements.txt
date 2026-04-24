@@ -1,0 +1,6 @@
+# SzPredict runtime requirements
+# Benchmark infrastructure is deliberately minimal —
+# community contributors add their own architecture-specific deps as needed.
+
+numpy>=1.20
+torch>=2.0           # CNN baseline; CPU-only install is fine for reference baselines

@@ -1,0 +1,66 @@
+{
+  "benchmark_version": "0.1",
+  "protocol": "cross_patient_fixed",
+  "model_name": "SimpleCNN",
+  "model_description": "3-layer 1D-CNN on raw EEG windows. Equal class weights, balanced-acc selection. No wavelets/FFT.",
+  "model_params": 159491,
+  "training_time_hours": null,
+  "hardware": "cuda:0",
+  "n_windows": 3000,
+  "per_class": {
+    "interictal": {
+      "correct": 2650,
+      "total": 2650,
+      "accuracy": 1.0
+    },
+    "preictal": {
+      "correct": 244,
+      "total": 244,
+      "accuracy": 1.0
+    },
+    "ictal": {
+      "correct": 106,
+      "total": 106,
+      "accuracy": 1.0
+    }
+  },
+  "confusion_matrix": {
+    "interictal": {
+      "pred_interictal": 2650,
+      "pred_preictal": 0,
+      "pred_ictal": 0
+    },
+    "preictal": {
+      "pred_interictal": 0,
+      "pred_preictal": 244,
+      "pred_ictal": 0
+    },
+    "ictal": {
+      "pred_interictal": 0,
+      "pred_preictal": 0,
+      "pred_ictal": 106
+    }
+  },
+  "seizure_discrimination": 1.0,
+  "sensitivity": 1.0,
+  "specificity": 1.0,
+  "false_negative_rate": 0.0,
+  "false_positive_rate": 0.0,
+  "f1_macro": 1.0,
+  "balanced_accuracy": 1.0,
+  "degenerate": {
+    "is_degenerate": false,
+    "single_class": null,
+    "threshold": 0.95
+  },
+  "clinical_utility": {
+    "warn_rate_given_seizure": 1.0,
+    "false_alarm_rate": 0.0
+  },
+  "miss_rate": {
+    "missed_events": 0,
+    "total_events": 5,
+    "miss_rate": 0.0
+  },
+  "lead_time": null
+}

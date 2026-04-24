@@ -1,0 +1,66 @@
+{
+  "benchmark_version": "0.1",
+  "protocol": "cross_patient_fixed",
+  "model_name": "Majority-Interictal",
+  "model_description": "Always predicts interictal (degenerate trap demonstration)",
+  "model_params": 0,
+  "training_time_hours": 0.0,
+  "hardware": "CPU only (no training)",
+  "n_windows": 10000,
+  "per_class": {
+    "interictal": {
+      "correct": 8826,
+      "total": 8826,
+      "accuracy": 1.0
+    },
+    "preictal": {
+      "correct": 0,
+      "total": 839,
+      "accuracy": 0.0
+    },
+    "ictal": {
+      "correct": 0,
+      "total": 335,
+      "accuracy": 0.0
+    }
+  },
+  "confusion_matrix": {
+    "interictal": {
+      "pred_interictal": 8826,
+      "pred_preictal": 0,
+      "pred_ictal": 0
+    },
+    "preictal": {
+      "pred_interictal": 839,
+      "pred_preictal": 0,
+      "pred_ictal": 0
+    },
+    "ictal": {
+      "pred_interictal": 335,
+      "pred_preictal": 0,
+      "pred_ictal": 0
+    }
+  },
+  "seizure_discrimination": 0.0,
+  "sensitivity": 0.0,
+  "specificity": 1.0,
+  "false_negative_rate": 1.0,
+  "false_positive_rate": 0.0,
+  "f1_macro": 0.3125464782747264,
+  "balanced_accuracy": 0.3333333333333333,
+  "degenerate": {
+    "is_degenerate": true,
+    "single_class": "interictal",
+    "threshold": 0.95
+  },
+  "clinical_utility": {
+    "warn_rate_given_seizure": 0.0,
+    "false_alarm_rate": 0.0
+  },
+  "miss_rate": {
+    "missed_events": 15,
+    "total_events": 15,
+    "miss_rate": 1.0
+  },
+  "lead_time": null
+}

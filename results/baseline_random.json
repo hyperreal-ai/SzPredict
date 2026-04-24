@@ -1,0 +1,67 @@
+{
+  "benchmark_version": "0.1",
+  "protocol": "cross_patient_fixed",
+  "model_name": "Random-Uniform",
+  "model_description": "Uniform random 3-class predictor (floor baseline)",
+  "model_params": 0,
+  "training_time_hours": 0.0,
+  "hardware": "CPU only (no training)",
+  "seed": 42,
+  "n_windows": 10000,
+  "per_class": {
+    "interictal": {
+      "correct": 3012,
+      "total": 8826,
+      "accuracy": 0.34126444595513256
+    },
+    "preictal": {
+      "correct": 275,
+      "total": 839,
+      "accuracy": 0.32777115613825986
+    },
+    "ictal": {
+      "correct": 108,
+      "total": 335,
+      "accuracy": 0.32238805970149254
+    }
+  },
+  "confusion_matrix": {
+    "interictal": {
+      "pred_interictal": 3012,
+      "pred_preictal": 2928,
+      "pred_ictal": 2886
+    },
+    "preictal": {
+      "pred_interictal": 290,
+      "pred_preictal": 275,
+      "pred_ictal": 274
+    },
+    "ictal": {
+      "pred_interictal": 97,
+      "pred_preictal": 130,
+      "pred_ictal": 108
+    }
+  },
+  "seizure_discrimination": 0.6703577512776832,
+  "sensitivity": 0.6703577512776832,
+  "specificity": 0.34126444595513256,
+  "false_negative_rate": 0.32964224872231684,
+  "false_positive_rate": 0.6587355540448674,
+  "f1_macro": 0.22818067794020738,
+  "balanced_accuracy": 0.33047455393162833,
+  "degenerate": {
+    "is_degenerate": false,
+    "single_class": null,
+    "threshold": 0.95
+  },
+  "clinical_utility": {
+    "warn_rate_given_seizure": 0.6703577512776832,
+    "false_alarm_rate": 0.6587355540448674
+  },
+  "miss_rate": {
+    "missed_events": 0,
+    "total_events": 15,
+    "miss_rate": 0.0
+  },
+  "lead_time": null
+}

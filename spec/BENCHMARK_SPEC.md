@@ -1,4 +1,4 @@
-# NeuroWave Benchmark Specification v0.1
+# SzPredict Benchmark Specification v0.1
 
 ## Standardised Evaluation Protocol for EEG Seizure Prediction on CHB-MIT
 

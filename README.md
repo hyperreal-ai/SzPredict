@@ -1,29 +1,70 @@
 # SzPredict
 
-**A standardised benchmark for EEG seizure prediction on the CHB-MIT Scalp EEG Database.**
+**An open benchmark for EEG seizure prediction on the CHB-MIT Scalp EEG Database.**
 
-Seizure prediction research has a reproducibility problem. Published results use inconsistent evaluation protocols, varying preictal windows, and patient-specific training that inflates reported metrics. Cross-patient generalisation — the clinically relevant benchmark — is rarely evaluated.
-
-SzPredict fixes this. Fixed data splits. Defined evaluation protocols. Consistent metrics. Honest baselines.
+Standardised evaluation protocols, consistent metrics, and a cross-patient testbed that surfaces failure modes the field has been hiding.
 
 > **Website:** [hyperreal.com.au/szpredict](https://hyperreal.com.au/szpredict/)
 > **Organisation:** [HyperReal](https://hyperreal.com.au/) — Adelaide, Australia
+> **License:** MIT (benchmark + baselines). Individual model architectures may have their own licensing.
+
+---
+
+## Quickstart
+
+Five minutes from `git clone` to running baselines.
+
+```bash
+git clone https://github.com/hyperreal-ai/SzPredict.git
+cd SzPredict
+./install.sh                              # Python deps + CHB-MIT setup (interactive)
+
+# Generate mock labels+windows for a quick pipeline test (no CHB-MIT needed)
+python scripts/make_mock_labels.py --out data/mock --n 10000 --events 15 --with-windows
+
+# Run the three reference baselines
+python -m baselines.baseline_random   --labels data/mock/labels.npy --event-ids data/mock/event_ids.npy --out results/mock_random.json
+python -m baselines.baseline_majority --labels data/mock/labels.npy --event-ids data/mock/event_ids.npy --out results/mock_majority.json
+python -m baselines.baseline_cnn train --train-x data/mock/windows.npy --train-y data/mock/labels.npy \
+                                        --val-x   data/mock/windows.npy --val-y   data/mock/labels.npy \
+                                        --out runs/cnn_mock --epochs 15
+python -m baselines.baseline_cnn eval  --ckpt runs/cnn_mock/best.pt \
+                                        --test-x  data/mock/windows.npy --test-y  data/mock/labels.npy \
+                                        --test-events data/mock/event_ids.npy \
+                                        --out results/mock_cnn.json
+
+# View metrics
+python -c "import json; print(json.dumps(json.load(open('results/mock_cnn.json')), indent=2))"
+```
+
+Real CHB-MIT pipeline follows the same pattern once `./install.sh` has set up the dataset — just swap the `--labels` / `--windows` paths.
+
+**Got a spare weekend and a GPU?** Swap the `baseline_cnn.py` backbone for your own architecture and run it through the same benchmark. Submit results via PR to `results/`. See [Contributing](#contributing).
 
 ---
 
 ## Why This Exists
 
-Most published seizure prediction results report **patient-specific** accuracy: train on patient X, test on patient X. These numbers look impressive (95%+) but say nothing about whether a model can predict seizures in a new, unseen patient — which is the only scenario that matters clinically.
+Most published seizure prediction results report **patient-specific** accuracy: train on patient X, test on patient X. These numbers look impressive (95%+) but say nothing about whether a model can predict seizures in a new, unseen patient — which is the scenario that matters clinically.
 
-SzPredict provides three evaluation protocols of increasing difficulty, so methods can be compared on equal footing:
+Across a 19-paper review of recent CHB-MIT work, reported sensitivities range from **58% to nearly 100%** — not because models differ that much, but because papers use incompatible task conventions, preictal windows, patient cohorts, and post-processing rules. Numbers look impressive in isolation; most aren't directly comparable.
+
+SzPredict pins every axis. See [`lit_review/corpus_synthesis.md`](lit_review/corpus_synthesis.md) for the full methodological analysis.
+
+---
+
+## Evaluation Protocols
 
 | Protocol | Method | Clinical Relevance |
 |----------|--------|-------------------|
 | **Protocol 1** | Patient-Specific | Literature comparison (inflated) |
-| **Protocol 2** | Leave-One-Patient-Out | Gold standard generalisation |
-| **Protocol 3** | Cross-Patient Fixed Split | Practical deployment evaluation |
+| **Protocol 2** | Leave-One-Patient-Out (LOPO) | Gold-standard generalisation |
+| **Protocol 3** | Cross-Patient Fixed Split | **Primary benchmark** — practical deployment evaluation |
+| **Protocol 4** | Transition Timing | Clinical utility — how early before onset does the model warn? |
 
-**Protocol 3 is our primary benchmark.** One training run. Evaluate on patients the model has never seen. No cherry-picking.
+**Protocol 4 is the metric that actually matters.** Not 'classification accuracy on balanced test segments' but 'how many minutes before seizure onset does the model reliably warn?' The clinical target is specific: a device that knows a patient's interictal baseline and says *"Caution — Preictal detected"* or, at full strength, *"Seizure Predicted — onset in approximately 13 minutes."*
+
+See [`spec/BENCHMARK_SPEC.md`](spec/BENCHMARK_SPEC.md) for full protocol definitions and [`spec/splits.json`](spec/splits.json) for Protocol 3's fixed patient split.
 
 ---
 
@@ -43,113 +84,65 @@ SzPredict provides three evaluation protocols of increasing difficulty, so metho
 | 1 | **Preictal** | 5-minute window (300s) immediately before seizure onset. |
 | 2 | **Ictal** | During seizure (onset to offset, as annotated). |
 
-**Preictal window = 300 seconds.** This is fixed. Published work varies this from 5 to 120 minutes — a major source of incomparability. We standardise at 5 minutes: the clinically actionable horizon (time to administer rescue medication or reach safety).
+**Preictal window = 300 seconds.** Fixed. Published work varies this from 5 to 120 minutes — a major source of incomparability. We standardise at 5 minutes: the clinically actionable horizon (time to administer rescue medication or reach safety).
 
-### Exclusion Zones
-
-- **Post-ictal:** 5 minutes after seizure offset excluded (distinct EEG characteristics confound classification)
-- **Consecutive seizures:** Inter-seizure periods under 10 minutes excluded entirely
+**Exclusion zones:**
+- Post-ictal: 5 minutes after seizure offset excluded
+- Consecutive seizures: inter-seizure periods under 10 minutes excluded entirely
 
 ---
 
-## Evaluation Protocols
+## Installation
 
-### Protocol 1 — Patient-Specific
+```bash
+./install.sh
+```
 
-Train and evaluate within each patient. Chronological 70/30 split (no shuffling — preserves temporal ordering). Per-patient metrics averaged across all patients.
+Interactive installer handles CHB-MIT dataset setup:
+1. **Download fresh** from PhysioNet (~42 GB, 20–60 min depending on bandwidth)
+2. **Use existing local copy** (provide path; installer symlinks and verifies structure)
+3. **Skip dataset** (install code only; use mock data for pipeline testing)
 
-*Included for literature comparison. Expected to overstate real-world performance.*
-
-### Protocol 2 — Leave-One-Patient-Out (LOPO)
-
-For each of 24 patients: train on the other 23, evaluate on the held-out patient. 24 full training runs. The gold standard for cross-patient generalisation.
-
-*Computationally expensive. Expected 10–30% performance drop vs patient-specific.*
-
-### Protocol 3 — Cross-Patient Fixed Split
-
-| Set | Patients | Count |
-|-----|----------|:---:|
-| **Train** | chb01, chb03, chb05, chb06, chb08, chb10, chb12, chb13, chb15, chb18, chb20, chb24 | 12 |
-| **Validation** | chb04, chb09, chb14, chb16, chb21 | 5 |
-| **Test** | chb02, chb07, chb11, chb17, chb19, chb22, chb23 | 7 |
-
-**Split rationale:**
-- High-seizure patients (chb12, chb15, chb24) in train to maximise training signal
-- Mix of seizure frequencies across all sets
-- Deterministic — no randomness, fully reproducible
-- Validation for hyperparameter tuning and early stopping only
-- Test set metrics are the final reported numbers (never used for model selection)
+Dependencies: Python 3.8+, numpy, torch. Full list in `requirements.txt`.
 
 ---
 
 ## Metrics
 
-### Primary
+Every submission is evaluated on a consistent suite. Primary metrics:
 
-| Metric | Definition | Why It Matters |
-|--------|------------|----------------|
-| **Sensitivity** | TP / (TP + FN) for seizure classes | How many seizures we catch |
-| **Specificity** | TN / (TN + FP) for interictal class | How often we correctly say "no seizure coming" |
-| **Seizure Discrimination** | Correct / Total for preictal + ictal combined | Overall seizure recognition rate |
-| **False Negative Rate** | Seizure windows misclassified as interictal / Total seizure windows | The dangerous errors — missed seizures |
-| **Balanced Accuracy** | Mean of per-class accuracies | Robust to class imbalance |
+- **Sensitivity** — TP / (TP + FN) on seizure classes
+- **Specificity** — TN / (TN + FP) on interictal
+- **Balanced Accuracy** — mean of per-class recalls (robust to class imbalance)
+- **F1 (macro)**
+- **False Positive Rate per hour** (FPR/h)
+- **Seizure Discrimination** — (preictal + ictal correct) / (preictal + ictal total). Preictal predicted as ictal counts as 'correct' — both are seizure states. *Not* equivalent to sensitivity.
 
-### Secondary
+Protocol 4 additional metrics:
+- **Preictal Lead Time** — minutes before onset the model first correctly flags preictal
+- **Transition Detection Rate** — fraction of seizure events detected in advance
 
-| Metric | Definition |
-|--------|------------|
-| **F1 (macro)** | Harmonic mean of precision & recall, macro-averaged |
-| **Confusion Matrix** | Full 3×3 error distribution (interictal / preictal / ictal) |
-| **Miss Rate** | Seizure events with zero correct predictions / Total seizure events |
-| **Detection Lead Time** | Time between first correct preictal prediction and seizure onset |
-
-### Degenerate Detector
-
-A model that predicts the same class for >95% of inputs is flagged as **degenerate**. This is common with aggressive class weighting on imbalanced datasets and should be reported honestly rather than concealed.
+**Degenerate Detector:** a model predicting the same class for >95% of inputs is flagged as **degenerate** in its submission. Common failure mode under aggressive class weighting. Report honestly; the benchmark exists to surface it.
 
 ---
 
-## Baseline Results
+## Reference Baselines
 
-Four model generations evaluated across two protocols. These are our first-generation baselines — published to demonstrate the benchmark framework and establish honest starting points.
+Three deliberately-minimal baselines in `baselines/`:
 
-### Own-Validation Results
+| Baseline | Purpose | Script |
+|---|---|---|
+| **Random** | Uniform-random 3-class predictor. Pure floor. | `baselines/baseline_random.py` |
+| **Majority-Interictal** | Always predicts interictal. Shows the degenerate trap. | `baselines/baseline_majority.py` |
+| **Simple 1D-CNN** | Minimal CNN on raw EEG windows. Equal class weights, balanced-accuracy model selection — swap in your own backbone. | `baselines/baseline_cnn.py` |
 
-| Model | Seizure Disc. | Specificity | Balanced Acc. | Status |
-|-------|:---:|:---:|:---:|--------|
-| Gen 1 — Baseline | 0.0% | 3.3% | 1.1% | Degenerate |
-| Gen 2 — Weighted Loss | 12.7% | 0.0% | 10.2% | Partial |
-| Gen 3 — Enhanced Tokenizer | 80.6% | 0.0% | 33.2% | Degenerate |
-| Gen 3b — LR Tuned | 80.8% | 0.2% | 33.4% | Degenerate |
-
-### Protocol 3 — Cross-Patient Results
-
-| Model | Seizure Disc. | Specificity | Balanced Acc. | Status |
-|-------|:---:|:---:|:---:|--------|
-| Gen 3 — Enhanced Tokenizer | 88.7% | 0.0% | 33.2% | Degenerate |
-| Gen 3b — LR Tuned | 88.5% | 0.5% | 33.3% | Degenerate |
-
-*33.3% balanced accuracy = random chance for a 3-class problem.*
-
-### Key Finding — Degenerate Classification
-
-All baseline models exhibit degenerate behaviour under rigorous evaluation. Models trained with aggressive class weighting (75× preictal, 300× ictal) learn to predict the highest-weighted class for nearly all inputs — achieving high seizure discrimination scores while completely failing to distinguish between brain states.
-
-**The benchmark caught what training evaluation missed.** This is exactly why SzPredict exists.
-
-Our next generation addresses this directly: equal class weights with balanced accuracy model selection instead of validation loss. Results forthcoming.
-
-### Hardware
-
-- **Training:** Dell C4130 (4× Pascal P100 16GB). No cloud compute.
-- **Benchmarking:** Surface Pro 5 (Intel i7-7660U, no GPU). Full Protocol 3 evaluation (~23,000 batches) runs in ~48 hours on CPU.
+All three use only standard PyTorch components. No proprietary architectures.
 
 ---
 
 ## Submission Format
 
-Results are submitted as JSON files conforming to the schema below. See [`results/`](results/) for examples from our baseline runs.
+Submit a JSON conforming to the schema documented in `spec/BENCHMARK_SPEC.md`. See `results/` for examples.
 
 ```json
 {
@@ -158,33 +151,41 @@ Results are submitted as JSON files conforming to the schema below. See [`result
   "model_name": "Your-Model-Name",
   "model_description": "Brief architecture description",
   "model_params": 28000000,
-  "training_time_hours": null,
-  "hardware": "GPU type and count",
-
-  "per_class": {
-    "interictal": {"correct": 0, "total": 0, "accuracy": 0.0},
-    "preictal":   {"correct": 0, "total": 0, "accuracy": 0.0},
-    "ictal":      {"correct": 0, "total": 0, "accuracy": 0.0}
-  },
-  "confusion_matrix": {
-    "interictal": {"pred_interictal": 0, "pred_preictal": 0, "pred_ictal": 0},
-    "preictal":   {"pred_interictal": 0, "pred_preictal": 0, "pred_ictal": 0},
-    "ictal":      {"pred_interictal": 0, "pred_preictal": 0, "pred_ictal": 0}
-  },
-  "seizure_discrimination": 0.0,
-  "false_negative_rate": 0.0,
+  "training_time_hours": 12.5,
+  "hardware": "1x RTX 5090",
+  "per_class": { ... },
+  "confusion_matrix": { ... },
   "sensitivity": 0.0,
   "specificity": 0.0,
+  "balanced_accuracy": 0.0,
+  "seizure_discrimination": 0.0,
   "f1_macro": 0.0,
-  "miss_rate": 0.0,
-  "lead_time": {
-    "mean_seconds": 0.0,
-    "median_seconds": 0.0,
-    "min_seconds": 0.0,
-    "max_seconds": 0.0
-  }
+  "degenerate": { "is_degenerate": false },
+  "clinical_utility": { ... },
+  "miss_rate": { ... },
+  "lead_time": { ... }
 }
 ```
+
+Generate this automatically with `szpredict.metrics.compute_all(predictions, labels, event_ids)`.
+
+---
+
+## Contributing
+
+We welcome community submissions. To add a result:
+
+1. Train your model under the protocol you're targeting (usually Protocol 3).
+2. Evaluate on the test split using `szpredict.metrics.compute_all()` on your predictions.
+3. Save the submission JSON to `results/<your_model_name>_<protocol>.json`.
+4. Open a PR. Include:
+   - Model architecture description (or paper link)
+   - Training data + preprocessing pipeline
+   - Hardware used + training time
+   - Any post-processing applied (smoothing, thresholding, etc.)
+   - Reproducibility checklist (see `spec/BENCHMARK_SPEC.md`)
+
+All reasonable submissions accepted. Degenerate results are **welcome** — publishing negative results is part of the benchmark's mission.
 
 ---
 
@@ -201,15 +202,16 @@ Results are submitted as JSON files conforming to the schema below. See [`result
 
 ---
 
-## Comparison with Existing Benchmarks
+## Methodological Context
 
-| Benchmark | Task | Dataset | Cross-Patient | Open Source |
-|-----------|------|---------|:---:|:---:|
-| SzCORE | Seizure *detection* | Multiple | Yes | Yes |
-| **SzPredict** | Seizure *prediction* | CHB-MIT | **Yes** | **Yes** |
-| Most published work | Prediction | CHB-MIT | No | No |
+Behind this benchmark sits a careful review of the CHB-MIT seizure-prediction literature:
 
-**SzCORE** benchmarks seizure *detection* (identifying seizures as they happen). **SzPredict** targets seizure *prediction* (forecasting before onset). These are complementary but distinct clinical problems. Detection helps during a seizure. Prediction helps *prevent* one.
+- [`lit_review/corpus_synthesis.md`](lit_review/corpus_synthesis.md) — 19-paper synthesis. 4 task conventions, 10+ rosetta dimensions, 6-group methodological convergence, 5 scarcity-mitigation strategies, 8-role corpus map.
+- [`lit_review/phase1_triage.md`](lit_review/phase1_triage.md) — Paper-by-paper triage with applicability scoring.
+
+The short version: the field has been comparing apples to oranges. SzPredict pins every axis so your result and theirs become directly comparable for the first time.
+
+**Key external reference:** Pale, Teijeiro & Atienza (2023), *Importance of methodological choices in data manipulation for validating epileptic seizure detection models* (arXiv:2302.10672). They called out the same problems this benchmark addresses. Cite them early and often.
 
 ---
 
@@ -217,17 +219,15 @@ Results are submitted as JSON files conforming to the schema below. See [`result
 
 SzPredict is part of a broader research programme in temporal signal intelligence:
 
-1. **Seizure Prediction** *(current)* — Cross-patient generalisation on CHB-MIT
-2. **EEG-to-fMRI Super-Resolution** *(next)* — Predict spatial brain maps from temporal EEG data
+1. **Seizure Prediction** *(current)* — Cross-patient generalisation + clinical transition timing on CHB-MIT
+2. **EEG-to-fMRI Super-Resolution** *(next)* — Predict spatial brain maps from temporal EEG
 3. **Brain-Computer Interface** *(future)* — Decode intention from non-invasive neural signals
 
-The core thesis: temporal signals with multi-scale structure benefit from wavelet decomposition before sequence modelling. This applies across domains — the same architectural approach that predicts seizures also powers our [financial market prediction](https://hyperreal.com.au/finform/) system (1,100+ live paper trades).
+Core thesis: temporal signals with multi-scale structure benefit from explicit wavelet decomposition before sequence modelling. This applies across domains — the architectural approach that predicts seizures also powers our [financial market prediction](https://hyperreal.com.au/finform/) system.
 
 ---
 
 ## Citation
-
-If you use SzPredict in your research, please cite:
 
 ```
 @misc{szpredict2026,
@@ -247,12 +247,16 @@ If you use SzPredict in your research, please cite:
 
 ---
 
-## License
+## Comparison with Existing Benchmarks
 
-Benchmark specification, evaluation protocols, and data splits: **MIT License**
+| Benchmark | Task | Dataset | Cross-Patient | Open Source |
+|-----------|------|---------|:---:|:---:|
+| SzCORE | Seizure *detection* | Multiple | Yes | Yes |
+| **SzPredict** | Seizure *prediction + transition timing* | CHB-MIT | **Yes** | **Yes** |
+| Most published work | Prediction | CHB-MIT | No | No |
 
-Baseline model architectures and training code: Proprietary (HyperReal). The benchmark is open — the models that compete on it need not be.
+SzCORE benchmarks seizure *detection* (identifying seizures as they happen). SzPredict targets seizure *prediction* (forecasting before onset) and *clinical transition timing* (how early the warning fires). Complementary but distinct clinical problems. Detection helps during a seizure. Prediction helps *prevent* one.
 
 ---
 
-*Built in Adelaide, Australia. Trained on a Dell C4130. Benchmarked on a Surface Pro 5. No cloud compute. No venture funding. Just work that matters.*
+*Built in Adelaide, Australia. Trained across progressively constrained hardware (Dell C4130 4×P100 → Surface Pro 5 CPU → Ryzen 5900X + A100 32GB) — under $2,000 total, no cloud compute. The constraints forced architectural choices toward efficient inference, which happens to be the same constraint wearable seizure-warning hardware requires.*

@@ -1,0 +1,63 @@
+# ===============================================
+# SzPredict .gitignore
+# ===============================================
+# Public repository. Keep strategic/internal files OFF GitHub.
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.Python
+.pytest_cache/
+.mypy_cache/
+.ipynb_checkpoints/
+venv/
+env/
+.env
+.venv
+
+# --- Data (too large for GitHub; users install via ./install.sh) ---
+data/chb-mit/
+data/chb-mit/*
+data/mock/
+data/mock_*/
+data/*.bin
+data/*.npy
+!data/.gitkeep
+
+# --- Training artifacts ---
+runs/
+checkpoints/
+*.pt
+*.pth
+*.ckpt
+
+# --- Strategic / internal (not for public repo) ---
+lit_review/preprint_outline.md
+lit_review/szpredict_webpage_audit.md
+lit_review/thu_eve_build_plan.md
+lit_review/rosetta_stone_draft.md
+lit_review/hero_draft.md
+lit_review/pdfs/
+README.old.md
+PHASE1_STATUS.md
+
+# (keep corpus_synthesis.md and phase1_triage.md — those are public-safe)
+
+# --- OS / editor ---
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+.idea/
+.vscode/
+
+# --- Logs ---
+*.log
+logs/
+
+# --- Temp ---
+/tmp/
+*.tmp
