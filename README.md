@@ -19,7 +19,10 @@ git clone https://github.com/hyperreal-ai/SzPredict.git
 cd SzPredict
 ./install.sh                              # Python deps + CHB-MIT setup (interactive)
 
-### install.sh repares the environment (venv), runs a mock pipeline test, downloads CHB-MIT data (or accepts location of dataset if already downloaded), prepares the data, trains a CNN model, tests that CNN model, benchmarks it and produces a protocol-3 result.
+### install.sh prepares the environment (venv), runs a mock pipeline test,
+### downloads CHB-MIT data (or accepts location of dataset if already downloaded),
+### prepares the data, trains a CNN model, tests that CNN model,
+### benchmarks it and produces a protocol-3 result.
 
 # Generate mock labels+windows for a quick pipeline test (no CHB-MIT needed)
 python scripts/make_mock_labels.py --out data/mock --n 10000 --events 15 --with-windows
