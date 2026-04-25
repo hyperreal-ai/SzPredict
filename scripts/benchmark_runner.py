@@ -240,13 +240,30 @@ def load_edf_windows(
         log.warning(f"{edf_path.name}: sample rate {raw.info['sfreq']} != {fs}, resampling")
         raw.resample(fs)
 
+    # Get data by INDEX (bypasses mne's unique-name check entirely).
+    # CHB-MIT EDFs (e.g., chb11) sometimes have duplicate channel names from
+    # mid-recording electrode adjustments. Pick first occurrence of each
+    # requested channel name; keep all if no requested list given.
     if channels is not None:
-        # Keep only requested channels (intersection; skip missing)
-        available = [ch for ch in channels if ch in raw.ch_names]
-        if available:
-            raw.pick(available)
+        wanted_set = set(channels)
+        seen: set = set()
+        keep_indices: List[int] = []
+        for idx, name in enumerate(raw.ch_names):
+            if name in wanted_set and name not in seen:
+                keep_indices.append(idx)
+                seen.add(name)
+        if not keep_indices:
+            keep_indices = list(range(len(raw.ch_names)))
+    else:
+        # No filter: still dedupe by first-occurrence
+        seen = set()
+        keep_indices = []
+        for idx, name in enumerate(raw.ch_names):
+            if name not in seen:
+                keep_indices.append(idx)
+                seen.add(name)
 
-    data = raw.get_data().astype(np.float32)  # [C, T_total]
+    data = raw.get_data(picks=keep_indices).astype(np.float32)  # [C, T_total]
     total_samples = data.shape[1]
     n_windows = total_samples // window_samples
     trimmed = data[:, : n_windows * window_samples]
@@ -372,7 +389,13 @@ def prepare_subject(
     """
     summary_path = subject_dir / f"{subject_dir.name}-summary.txt"
     if not summary_path.exists():
-        raise FileNotFoundError(f"Missing summary: {summary_path}")
+        # Try a few alternative naming conventions seen in some CHB-MIT mirrors
+        alts = list(subject_dir.glob("*[Ss]ummary*.txt"))
+        if alts:
+            summary_path = alts[0]
+            log.warning(f"{subject_dir.name}: using alt summary path {summary_path.name}")
+        else:
+            raise FileNotFoundError(f"Missing summary: {summary_path}")
     index = parse_chbmit_summary(summary_path)
 
     window_samples = int(round(window_seconds * FS_HZ))
@@ -440,7 +463,20 @@ def prepare_subject(
     labels = np.concatenate(all_labels)
     event_ids = np.concatenate(all_event_ids)
     window_times = np.concatenate(all_window_times)
-    windows = np.concatenate(all_windows, axis=0) if (include_windows and all_windows) else None
+
+    windows = None
+    if include_windows and all_windows:
+        # CHB-MIT subjects sometimes have variable channel counts across their
+        # EDF files (mid-recording montage changes). Truncate all to the smallest
+        # channel count seen so we can concatenate cleanly.
+        min_channels = min(w.shape[1] for w in all_windows)
+        if any(w.shape[1] != min_channels for w in all_windows):
+            log.warning(
+                f"{subject_dir.name}: variable channel counts across EDFs "
+                f"({sorted({w.shape[1] for w in all_windows})}), truncating to {min_channels}"
+            )
+        all_windows = [w[:, :min_channels, :] for w in all_windows]
+        windows = np.concatenate(all_windows, axis=0)
 
     return labels, event_ids, window_times, event_onset_times, windows
 
@@ -479,12 +515,19 @@ def prepare_split(
             continue
 
         log.info(f"Preparing {sid} ...")
-        labels, event_ids, window_times, onset_times, windows = prepare_subject(
-            subject_dir=subject_dir,
-            window_seconds=window_seconds,
-            include_windows=include_windows,
-            event_id_base=event_counter,
-        )
+        try:
+            labels, event_ids, window_times, onset_times, windows = prepare_subject(
+                subject_dir=subject_dir,
+                window_seconds=window_seconds,
+                include_windows=include_windows,
+                event_id_base=event_counter,
+            )
+        except (FileNotFoundError, RuntimeError) as e:
+            log.warning(f"{sid}: {e} — skipping subject")
+            continue
+        except Exception as e:
+            log.warning(f"{sid}: unexpected error ({type(e).__name__}: {e}) — skipping subject")
+            continue
 
         # Offset window times so concatenation across subjects is monotonic
         window_times = window_times + time_offset
@@ -511,7 +554,17 @@ def prepare_split(
     labels = np.concatenate(all_labels)
     event_ids = np.concatenate(all_event_ids)
     window_times = np.concatenate(all_window_times)
-    windows = np.concatenate(all_windows, axis=0) if all_windows else None
+    windows = None
+    if all_windows:
+        # Cross-subject channel count may also differ. Truncate to common minimum.
+        min_channels = min(w.shape[1] for w in all_windows)
+        if any(w.shape[1] != min_channels for w in all_windows):
+            log.warning(
+                f"Subjects in split have variable channel counts "
+                f"({sorted({w.shape[1] for w in all_windows})}), truncating to {min_channels}"
+            )
+        all_windows = [w[:, :min_channels, :] for w in all_windows]
+        windows = np.concatenate(all_windows, axis=0)
 
     return labels, event_ids, window_times, all_onset_times, windows
 

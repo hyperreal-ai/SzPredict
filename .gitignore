@@ -15,6 +15,7 @@ __pycache__/
 venv/
 env/
 .env
+.venv/
 .venv
 
 # --- Data (too large for GitHub; users install via ./install.sh) ---
@@ -22,8 +23,11 @@ data/chb-mit/
 data/chb-mit/*
 data/mock/
 data/mock_*/
+data/_smoke_test/
 data/*.bin
 data/*.npy
+results/_smoke_*.json
+runs/_smoke_*/
 !data/.gitkeep
 
 # --- Training artifacts ---

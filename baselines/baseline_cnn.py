@@ -219,7 +219,7 @@ def eval_cmd(args):
         "benchmark_version": "0.1",
         "protocol": args.protocol,
         "model_name": "SimpleCNN",
-        "model_description": "3-layer 1D-CNN on raw EEG windows. Equal class weights, balanced-acc selection. No wavelets/FFT.",
+        "model_description": "3-layer 1D-CNN on raw EEG windows. Equal class weights, balanced-acc selection.",
         "model_params": ckpt.get("n_params") or sum(p.numel() for p in model.parameters()),
         "training_time_hours": None,
         "hardware": str(device),

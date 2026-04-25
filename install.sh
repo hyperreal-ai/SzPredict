@@ -45,14 +45,38 @@ if [[ "$PY_MAJOR" -lt 3 ]] || { [[ "$PY_MAJOR" -eq 3 ]] && [[ "$PY_MINOR" -lt 8 
 fi
 echo "${GREEN}✓${NC} Python ${PY_VERSION} found"
 
-# --- pip install ---
+# --- venv + pip install ---
+# PEP 668 (Debian/Ubuntu/Pop!_OS modern Python) blocks system-wide pip,
+# so we always install into a project-local venv at ./.venv
+VENV_DIR="$SCRIPT_DIR/.venv"
+
+if [[ ! -d "$VENV_DIR" ]]; then
+    echo ""
+    echo "Creating Python venv at $VENV_DIR ..."
+    if ! "$PYTHON_CMD" -m venv "$VENV_DIR"; then
+        echo "${RED}ERROR: venv creation failed. Install python3-venv (or python3-full on Debian).${NC}"
+        echo "  sudo apt install python3-venv     # Debian/Ubuntu/Pop!_OS"
+        exit 1
+    fi
+    echo "${GREEN}✓${NC} venv created"
+fi
+
+VENV_PY="$VENV_DIR/bin/python"
+
 echo ""
-echo "Installing Python dependencies from requirements.txt ..."
-if ! "$PYTHON_CMD" -m pip install --upgrade -r requirements.txt; then
+echo "Installing Python dependencies into venv from requirements.txt ..."
+if ! "$VENV_PY" -m pip install --upgrade pip >/dev/null; then
+    echo "${YELLOW}Warning: failed to upgrade pip in venv (continuing).${NC}"
+fi
+if ! "$VENV_PY" -m pip install -r requirements.txt; then
     echo "${RED}ERROR: pip install failed. See output above.${NC}"
     exit 1
 fi
-echo "${GREEN}✓${NC} Python dependencies installed"
+echo "${GREEN}✓${NC} Python dependencies installed in $VENV_DIR"
+echo ""
+echo "${YELLOW}NOTE:${NC} Activate the venv before running scripts:"
+echo "  source $VENV_DIR/bin/activate"
+echo "  # ... or prefix commands with: $VENV_PY"
 
 # --- Dataset handling ---
 if [[ "${1:-}" == "--skip-dataset" ]]; then
@@ -63,6 +87,97 @@ if [[ "${1:-}" == "--skip-dataset" ]]; then
     echo "${GREEN}Install complete.${NC}"
     exit 0
 fi
+
+# --- Smoke test: mock pipeline end-to-end ---
+# Confirms numpy, torch, metrics module, all 3 baselines, file I/O all work
+# on this machine. Skip with --no-smoke-test.
+
+SMOKE_TEST_FLAG=true
+for arg in "$@"; do
+    [[ "$arg" == "--no-smoke-test" ]] && SMOKE_TEST_FLAG=false
+done
+
+if $SMOKE_TEST_FLAG; then
+    echo ""
+    echo "${BLUE}==============================================${NC}"
+    echo "${BLUE}  Smoke test — mock pipeline end-to-end${NC}"
+    echo "${BLUE}==============================================${NC}"
+    echo "Validates the install by running all 3 baselines on synthetic data."
+    echo "Takes ~30-60 seconds. Skip with: ./install.sh --no-smoke-test"
+    echo ""
+
+    SMOKE_DIR="$SCRIPT_DIR/data/_smoke_test"
+    rm -rf "$SMOKE_DIR"
+    mkdir -p "$SMOKE_DIR" "$SCRIPT_DIR/results" "$SCRIPT_DIR/runs"
+
+    SMOKE_FAIL=0
+
+    echo "  [1/4] Generating mock data ..."
+    if ! "$VENV_PY" scripts/make_mock_labels.py --out "$SMOKE_DIR" --n 2000 --events 5 --with-windows >/dev/null; then
+        echo "${RED}    FAIL: mock data generation failed${NC}"
+        SMOKE_FAIL=1
+    else
+        echo "${GREEN}    OK${NC}"
+    fi
+
+    if [[ $SMOKE_FAIL -eq 0 ]]; then
+        echo "  [2/4] Running baseline_random ..."
+        if ! "$VENV_PY" -m baselines.baseline_random --labels "$SMOKE_DIR/labels.npy" --event-ids "$SMOKE_DIR/event_ids.npy" --out "$SCRIPT_DIR/results/_smoke_random.json" >/dev/null; then
+            echo "${RED}    FAIL: baseline_random failed${NC}"
+            SMOKE_FAIL=1
+        else
+            echo "${GREEN}    OK${NC}"
+        fi
+    fi
+
+    if [[ $SMOKE_FAIL -eq 0 ]]; then
+        echo "  [3/4] Running baseline_majority ..."
+        if ! "$VENV_PY" -m baselines.baseline_majority --labels "$SMOKE_DIR/labels.npy" --event-ids "$SMOKE_DIR/event_ids.npy" --out "$SCRIPT_DIR/results/_smoke_majority.json" >/dev/null; then
+            echo "${RED}    FAIL: baseline_majority failed${NC}"
+            SMOKE_FAIL=1
+        else
+            echo "${GREEN}    OK${NC}"
+        fi
+    fi
+
+    if [[ $SMOKE_FAIL -eq 0 ]]; then
+        echo "  [4/4] Running baseline_cnn (5 epochs, CPU OK) ..."
+        if ! "$VENV_PY" -m baselines.baseline_cnn train \
+            --train-x "$SMOKE_DIR/windows.npy" --train-y "$SMOKE_DIR/labels.npy" \
+            --val-x "$SMOKE_DIR/windows.npy"   --val-y "$SMOKE_DIR/labels.npy" \
+            --out "$SCRIPT_DIR/runs/_smoke_cnn" --epochs 5 --device cpu >/dev/null 2>&1; then
+            echo "${RED}    FAIL: baseline_cnn train failed${NC}"
+            SMOKE_FAIL=1
+        else
+            if ! "$VENV_PY" -m baselines.baseline_cnn eval \
+                --ckpt "$SCRIPT_DIR/runs/_smoke_cnn/best.pt" \
+                --test-x "$SMOKE_DIR/windows.npy" --test-y "$SMOKE_DIR/labels.npy" \
+                --test-events "$SMOKE_DIR/event_ids.npy" \
+                --out "$SCRIPT_DIR/results/_smoke_cnn.json" --device cpu >/dev/null 2>&1; then
+                echo "${RED}    FAIL: baseline_cnn eval failed${NC}"
+                SMOKE_FAIL=1
+            else
+                echo "${GREEN}    OK${NC}"
+            fi
+        fi
+    fi
+
+    echo ""
+    if [[ $SMOKE_FAIL -eq 0 ]]; then
+        echo "${GREEN}==============================================${NC}"
+        echo "${GREEN}  Smoke test PASSED — pipeline is healthy.${NC}"
+        echo "${GREEN}==============================================${NC}"
+        echo "Output files in: results/_smoke_*.json (safe to delete)"
+    else
+        echo "${RED}==============================================${NC}"
+        echo "${RED}  Smoke test FAILED — see errors above.${NC}"
+        echo "${RED}==============================================${NC}"
+        echo "Re-run with verbose output to debug:"
+        echo "  source $VENV_DIR/bin/activate"
+        echo "  python -m baselines.baseline_random --labels $SMOKE_DIR/labels.npy --out /tmp/test.json"
+    fi
+fi
+
 
 echo ""
 echo "${BLUE}==============================================${NC}"
@@ -153,13 +268,73 @@ case "$DATASET_CHOICE" in
         ;;
 esac
 
+
+# --- Optional: end-to-end CHB-MIT benchmark run ---
+# Only offer if the dataset symlink/download succeeded.
+if [[ -d "$DATASET_DIR" ]] && [[ "${DATASET_CHOICE:-}" != "3" ]]; then
+    echo ""
+    echo "${BLUE}==============================================${NC}"
+    echo "${BLUE}  Optional end-to-end CHB-MIT benchmark${NC}"
+    echo "${BLUE}==============================================${NC}"
+    echo "Runs benchmark_runner.py prepare on the test split, then"
+    echo "trains baseline_cnn and scores it. ~30-90 min depending on hardware."
+    echo "Validates the full pipeline (EDF parsing → labels → train → eval)."
+    echo ""
+    read -r -p "Run end-to-end benchmark now? [y/N]: " RUN_E2E
+
+    if [[ "$RUN_E2E" == "y" || "$RUN_E2E" == "Y" ]]; then
+        E2E_DIR="$SCRIPT_DIR/data/chbmit_p3/test"
+        echo ""
+        echo "  [1/3] Preparing CHB-MIT Protocol 3 test split (this loads EDF files) ..."
+        if ! "$VENV_PY" scripts/benchmark_runner.py prepare \
+            --chb-mit-dir "$DATASET_DIR" \
+            --out "$E2E_DIR" \
+            --protocol 3 --split test \
+            --window-seconds 1 --include-windows; then
+            echo "${RED}    FAIL: prepare step failed. Skipping rest of E2E.${NC}"
+        else
+            echo "${GREEN}    OK${NC}"
+            echo "  [2/3] Training baseline_cnn on test split (using as both train+val for smoke purposes) ..."
+            if ! "$VENV_PY" -m baselines.baseline_cnn train \
+                --train-x "$E2E_DIR/windows.npy" --train-y "$E2E_DIR/labels.npy" \
+                --val-x "$E2E_DIR/windows.npy" --val-y "$E2E_DIR/labels.npy" \
+                --out "$SCRIPT_DIR/runs/cnn_e2e" --epochs 5; then
+                echo "${RED}    FAIL: CNN training failed.${NC}"
+            else
+                echo "${GREEN}    OK${NC}"
+                echo "  [3/3] Evaluating + scoring ..."
+                if ! "$VENV_PY" -m baselines.baseline_cnn eval \
+                    --ckpt "$SCRIPT_DIR/runs/cnn_e2e/best.pt" \
+                    --test-x "$E2E_DIR/windows.npy" --test-y "$E2E_DIR/labels.npy" \
+                    --test-events "$E2E_DIR/event_ids.npy" \
+                    --out "$SCRIPT_DIR/results/baseline_cnn_chbmit_p3_test_e2e.json"; then
+                    echo "${RED}    FAIL: eval failed.${NC}"
+                else
+                    echo "${GREEN}    OK${NC}"
+                    echo ""
+                    echo "${GREEN}End-to-end benchmark complete.${NC}"
+                    echo "Result: $SCRIPT_DIR/results/baseline_cnn_chbmit_p3_test_e2e.json"
+                fi
+            fi
+        fi
+    else
+        echo "Skipped. To run later:"
+        echo "  source $VENV_DIR/bin/activate"
+        echo "  python scripts/benchmark_runner.py prepare --chb-mit-dir data/chb-mit \\"
+        echo "    --out data/chbmit_p3/test --protocol 3 --split test --include-windows"
+    fi
+fi
+
 echo ""
 echo "${GREEN}==============================================${NC}"
 echo "${GREEN}  Install complete.${NC}"
 echo "${GREEN}==============================================${NC}"
 echo ""
+echo "Activate the venv before running scripts:"
+echo "  source $VENV_DIR/bin/activate"
+echo ""
 echo "Next steps:"
-echo "  • Mock pipeline test: see Quickstart in README.md"
-echo "  • Benchmark spec:     spec/BENCHMARK_SPEC.md"
-echo "  • Submit results:     docs/CONTRIBUTING.md"
+echo "  • Full Protocol 3 prep: scripts/benchmark_runner.py prepare-all ..."
+echo "  • Benchmark spec:       spec/BENCHMARK_SPEC.md"
+echo "  • Submit results:       CONTRIBUTING.md"
 echo ""
